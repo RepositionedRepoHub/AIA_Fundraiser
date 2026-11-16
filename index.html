@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pump Roulette</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: one vertical column built for phone screen recording. Title, slim tabs, then either the slot machine (Play) or the settings (Setup). */
+:root {
+  --bg: #f1fafe;
+  --surface: #ffffff;
+  --ink: #1f2b3a;
+  --muted: #5c6b7c;
+  --accent: #f5a9b8;
+  --accent-text: #c93f68;
+  --blue: #5bcefa;
+  --navy: #1f2b3a;
+  --line: #d3e6ef;
+  --font-display: "Bebas Neue", Impact, "Arial Narrow", sans-serif;
+  --font-body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1a26;
+    --surface: #172433;
+    --ink: #eef8fc;
+    --muted: #9db2c2;
+    --accent-text: #f5a9b8;
+    --line: #2a3d50;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1a26;
+  --surface: #172433;
+  --ink: #eef8fc;
+  --muted: #9db2c2;
+  --accent-text: #f5a9b8;
+  --line: #2a3d50;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-user-select: none; user-select: none;
+}
+input { -webkit-user-select: text; user-select: text; }
+.wrap {
+  min-height: 100%; max-width: 480px; margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; justify-content: center; gap: 16px;
+}
+h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.02em; margin: 0; text-wrap: balance; }
+h1 { text-align: center; font-size: clamp(56px, 17vw, 84px); line-height: 0.9; }
+h1 span { color: var(--accent-text); }
+h2 { font-size: 28px; line-height: 1; }
+button { font: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent-text); outline-offset: 2px; }
+
+.tabs { display: flex; justify-content: center; gap: 4px; border-bottom: 2px solid var(--line); }
+.tab { background: transparent; border: 0; border-bottom: 4px solid transparent; margin-bottom: -2px; padding: 4px 18px;
+  font-family: var(--font-display); font-size: 24px; letter-spacing: 0.04em; color: var(--muted); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--ink); }
+.pane { display: flex; flex-direction: column; gap: 20px; }
+.pane[hidden] { display: none; }
+
+/* Slot machine */
+.machine {
+  background: var(--navy); border: 1px solid var(--line); border-radius: 22px; padding: 18px;
+  display: flex; flex-direction: column; gap: 16px; box-shadow: 0 8px 0 var(--blue);
+}
+.reels { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 12px; }
+.rl { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.rl small { font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: #cfe9f5; text-align: center; }
+.win { position: relative; height: 360px; overflow: hidden; border-radius: 12px; background: #fff; border: 3px solid #f1fafe; }
+.strip { will-change: transform; }
+.row {
+  height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 0 10px; font-family: var(--font-display); font-size: clamp(30px, 9vw, 46px); line-height: 1;
+  color: #1f2b3a; overflow: hidden; overflow-wrap: anywhere; font-variant-numeric: tabular-nums;
+}
+.row.num { font-size: clamp(60px, 18vw, 84px); }
+.row.fail { font-size: clamp(30px, 8.5vw, 42px); letter-spacing: 0.04em; }
+.cover { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: #fff;
+  font-family: var(--font-display); font-size: 88px; color: #1f2b3a; }
+.cover[hidden] { display: none; }
+.payline { position: absolute; left: 0; right: 0; top: 120px; height: 120px; border-top: 5px solid #1f2b3a; border-bottom: 5px solid #1f2b3a; pointer-events: none; }
+.shade { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(31,43,58,0.38), rgba(31,43,58,0) 32%, rgba(31,43,58,0) 68%, rgba(31,43,58,0.38)); }
+.result {
+  font-family: var(--font-display); font-size: clamp(40px, 12vw, 58px); line-height: 1; text-align: center;
+  color: #f5a9b8; min-height: 1.1em; overflow-wrap: anywhere;
+}
+.spin {
+  background: var(--accent); color: var(--navy); border: 0; border-radius: 14px;
+  font-family: var(--font-display); font-size: 48px; letter-spacing: 0.05em; padding: 14px 20px;
+  box-shadow: 0 5px 0 var(--blue); transition: transform 0.08s, box-shadow 0.08s;
+}
+.spin:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 var(--blue); }
+.spin:disabled { opacity: 0.6; cursor: not-allowed; }
+.spin:focus-visible { outline-color: #fff; outline-offset: 3px; }
+.credit { margin: 0; text-align: center; font-size: 15px; font-weight: 500; letter-spacing: 0.03em; color: var(--ink); }
+.credit:empty { display: none; }
+
+/* Setup */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.count { font-size: 14px; font-weight: 700; color: var(--muted); }
+.count.warn { color: var(--accent-text); }
+.hint { margin: 0; color: var(--muted); font-size: 14px; }
+.chipgrid { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { background: transparent; color: var(--ink); border: 2px solid var(--line); border-radius: 999px; padding: 7px 14px; font-weight: 500; font-size: 15px; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--navy); border-color: var(--navy); font-weight: 700; }
+.row-in { display: flex; gap: 8px; }
+.row-in input { flex: 1; min-width: 0; }
+label, .lbl { font-size: 13px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+input[type="text"], input[type="number"] {
+  font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; width: 100%;
+}
+.range { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.btn { background: var(--ink); color: var(--bg); border: 0; border-radius: 8px; padding: 10px 16px; font-weight: 700; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.check { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 500; color: var(--ink); }
+.check input { width: 18px; height: 18px; accent-color: var(--accent-text); }
+@media (prefers-reduced-motion: reduce) { .spin { transition: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="mbEx" x="0" y="-10%" width="100%" height="120%"><feGaussianBlur id="mbExStd" stdDeviation="0 0"/></filter>
+  <filter id="mbReps" x="0" y="-10%" width="100%" height="120%"><feGaussianBlur id="mbRepsStd" stdDeviation="0 0"/></filter>
+</svg>
+<div class="wrap">
+  <h1>Pump <span>Roulette</span></h1>
+
+  <div class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" id="tabPlay" role="tab" type="button" aria-selected="true" aria-controls="panePlay">Play</button>
+    <button class="tab" id="tabSetup" role="tab" type="button" aria-selected="false" aria-controls="paneSetup" tabindex="-1">Setup</button>
+  </div>
+
+  <div class="pane" id="panePlay" role="tabpanel" aria-labelledby="tabPlay">
+    <main class="machine" aria-label="Slot machine">
+      <div class="reels">
+        <div class="rl">
+          <small>Exercise</small>
+          <div class="win" role="img" aria-label="Exercise reel">
+            <div class="strip" id="exStrip"></div>
+            <div class="cover" id="exCover">?</div>
+            <div class="payline"></div><div class="shade"></div>
+          </div>
+        </div>
+        <div class="rl">
+          <small>Reps</small>
+          <div class="win" role="img" aria-label="Reps reel">
+            <div class="strip" id="repsStrip"></div>
+            <div class="cover" id="repsCover">?</div>
+            <div class="payline"></div><div class="shade"></div>
+          </div>
+        </div>
+      </div>
+      <div class="result" id="result" aria-live="polite">Ready?</div>
+      <button class="spin" id="spinBtn" type="button">SPIN</button>
+    </main>
+    <p class="credit" id="credit"></p>
+  </div>
+
+  <div class="pane" id="paneSetup" role="tabpanel" aria-labelledby="tabSetup" hidden>
+    <section class="card" aria-labelledby="exH">
+      <div class="head">
+        <h2 id="exH">Exercises</h2>
+        <span class="count" id="count"></span>
+      </div>
+      <p class="hint">Tap to pick 4 to 6. Tap again to remove.</p>
+      <div class="chipgrid" id="chips"></div>
+      <div class="row-in">
+        <input type="text" id="newEx" placeholder="Add your own" maxlength="30" autocomplete="off" aria-label="Add your own exercise">
+        <button class="btn" id="addBtn" type="button">Add</button>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="repH">
+      <h2 id="repH">Reps</h2>
+      <div class="range">
+        <div class="field">
+          <label for="minReps">Lowest</label>
+          <input type="number" id="minReps" min="1" max="100" value="10" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="maxReps">Highest</label>
+          <input type="number" id="maxReps" min="1" max="100" value="25" inputmode="numeric">
+        </div>
+      </div>
+      <label class="check" for="failOn"><input type="checkbox" id="failOn" checked> Include one "To Failure" slot</label>
+      <p class="hint">Each spin picks a whole number from lowest to highest (1 to 100). The failure slot has the same odds as any single number.</p>
+    </section>
+
+    <div class="row-in" style="justify-content:space-between; align-items:center">
+      <p class="hint">Saved in this browser only.</p>
+      <button class="btn ghost" id="resetBtn" type="button">Reset to defaults</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  /* ---- Defaults. Edit these to change what visitors see first. ---- */
+  var CONFIG = {
+    exercises: ["Push-ups", "Squats", "Burpees", "Lunges", "Kettlebell swings"], // selected by default
+    morePool: ["Sit-ups", "Jumping jacks", "Mountain climbers", "Dips", "Pull-ups", "Glute bridges",
+               "Plank shoulder taps", "Jump squats", "Russian twists", "Dumbbell curls", "Shoulder press"],
+    minReps: 10,
+    maxReps: 25,
+    failure: true,   // adds one "To Failure" slot with the same odds as any single number
+    credit: ""       // optional line under the machine, e.g. a handle or campaign name
+  };
+  var KEY = "pump-roulette-v2";
+  var MAX_SEL = 6, MIN_SEL = 4;
+
+  // Trans flag: blue, pink, white. Row text is always dark navy since all three are light.
+  var FLAG = ["#5bcefa", "#f5a9b8", "#ffffff"];
+  var H = 120; // row height in px, matches .row and .payline in CSS
+
+  function sliceColor(i, n) {
+    var k = i % 3;
+    if (n % 3 === 1 && i === n - 1) k = 1; // keep the last and first rows from matching
+    return FLAG[k];
+  }
+  function clampRep(v, d) { v = parseInt(v, 10); if (isNaN(v)) v = d; return Math.min(100, Math.max(1, v)); }
+
+  function defaults() {
+    return {
+      pool: CONFIG.exercises.concat(CONFIG.morePool),
+      selected: CONFIG.exercises.slice(),
+      minReps: CONFIG.minReps, maxReps: CONFIG.maxReps, failure: CONFIG.failure
+    };
+  }
+  var state = defaults();
+  function load() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (!s || !Array.isArray(s.pool) || !Array.isArray(s.selected)) return;
+      var pool = s.pool.map(String).filter(Boolean);
+      var sel = s.selected.map(String).filter(function (n) { return pool.indexOf(n) >= 0; }).slice(0, MAX_SEL);
+      state.pool = pool; state.selected = sel;
+      state.minReps = clampRep(s.minReps, CONFIG.minReps);
+      state.maxReps = Math.max(state.minReps, clampRep(s.maxReps, CONFIG.maxReps));
+      state.failure = s.failure !== false;
+    } catch (e) {}
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var spinning = false, pendingSync = false;
+  var $ = function (id) { return document.getElementById(id); };
+  var reduce = function () { return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches; };
+
+  var reels = {
+    ex: { strip: $("exStrip"), items: [], len: 0, k: 0, isReps: false, fid: "mbEx", std: $("mbExStd") },
+    reps: { strip: $("repsStrip"), items: [], len: 0, k: 0, isReps: true, fid: "mbReps", std: $("mbRepsStd") }
+  };
+
+  /* ---- Reels ---- */
+  function rowEl(r, idx) {
+    var item = r.items[idx];
+    var d = document.createElement("div");
+    d.className = "row" + (r.isReps ? (item === "FAIL" ? " fail" : " num") : "");
+    d.style.background = sliceColor(idx, r.len);
+    d.textContent = item === "FAIL" ? "TO FAILURE" : String(item);
+    return d;
+  }
+  function buildStrip(r, rows) {
+    var frag = document.createDocumentFragment();
+    if (r.len) for (var i = 0; i < rows; i++) frag.appendChild(rowEl(r, i % r.len));
+    r.strip.textContent = "";
+    r.strip.appendChild(frag);
+  }
+  function setY(r, y) { r.strip.style.transform = "translateY(" + y + "px)"; }
+  function resetReel(r, items, pos) {
+    r.items = items; r.len = items.length; r.k = r.len + pos;
+    buildStrip(r, r.len * 3);
+    setY(r, (1 - r.k) * H);
+  }
+  function ease(t) { return 1 - Math.pow(1 - t, 4); }
+
+  function runReel(r, target, dur, done) {
+    var len = r.len, k = r.k, min = k + 70;
+    var f = min + (((target - min) % len) + len) % len; // lands on target, at least 70 rows away
+    function finish() { r.strip.style.filter = "none"; r.std.setAttribute("stdDeviation", "0 0"); resetReel(r, r.items, target); done(); }
+    if (reduce()) { finish(); return; }
+    buildStrip(r, f + 3);
+    var y0 = (1 - k) * H, y1 = (1 - f) * H, t0 = null;
+    r.strip.style.filter = "url(#" + r.fid + ")";
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var p = Math.min(1, (ts - t0) / dur);
+      setY(r, y0 + (y1 - y0) * ease(p));
+      // Vertical motion blur: full strength until the last 20%, then it clears as the reel settles.
+      var b = p < 0.8 ? 9 : 9 * (1 - p) / 0.2;
+      r.std.setAttribute("stdDeviation", "0 " + b.toFixed(2));
+      if (p < 1) requestAnimationFrame(frame); else finish();
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function buildRepsItems() {
+    var a = [], i;
+    for (i = state.minReps; i <= state.maxReps; i++) a.push(i);
+    if (state.failure) a.push("FAIL");
+    for (i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function syncReels() {
+    resetReel(reels.ex, state.selected.slice(), 0);
+    resetReel(reels.reps, buildRepsItems(), 0);
+  }
+  function changed() {
+    save();
+    if (spinning) pendingSync = true; else syncReels();
+  }
+
+  /* ---- Spin ---- */
+  function spin() {
+    if (spinning) return;
+    if (state.selected.length < MIN_SEL) { $("result").textContent = "Pick " + MIN_SEL + "+ exercises in Setup"; return; }
+    spinning = true; $("spinBtn").disabled = true;
+    $("result").textContent = "Spinning...";
+    $("exCover").hidden = true; $("repsCover").hidden = true;
+    var exIdx = Math.floor(Math.random() * reels.ex.len);
+    var repIdx = Math.floor(Math.random() * reels.reps.len);
+    var ex = reels.ex.items[exIdx], reps = reels.reps.items[repIdx];
+    var pending = 2;
+    function fin() {
+      pending--;
+      if (pending > 0) return;
+      $("result").textContent = reps === "FAIL" ? ex + ": to failure" : reps + " × " + ex;
+      spinning = false; $("spinBtn").disabled = false;
+      if (pendingSync) { pendingSync = false; syncReels(); }
+    }
+    runReel(reels.ex, exIdx, 2200, fin);
+    runReel(reels.reps, repIdx, 3000, fin);
+  }
+
+  /* ---- Setup ---- */
+  function renderChips() {
+    var box = $("chips"); box.textContent = "";
+    state.pool.forEach(function (name) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.textContent = name;
+      b.setAttribute("aria-pressed", state.selected.indexOf(name) >= 0 ? "true" : "false");
+      b.addEventListener("click", function () { toggle(name); });
+      box.appendChild(b);
+    });
+    var c = $("count"), n = state.selected.length;
+    c.textContent = n + " of " + MAX_SEL + " selected";
+    c.className = "count" + (n < MIN_SEL ? " warn" : "");
+  }
+  function toggle(name) {
+    var i = state.selected.indexOf(name);
+    if (i >= 0) state.selected.splice(i, 1);
+    else if (state.selected.length < MAX_SEL) state.selected.push(name);
+    else { $("count").textContent = "Max " + MAX_SEL + ". Remove one first."; $("count").className = "count warn"; return; }
+    renderChips(); changed();
+  }
+  function addCustom() {
+    var inp = $("newEx"), v = inp.value.trim();
+    if (!v) return;
+    var found = null;
+    state.pool.forEach(function (n) { if (n.toLowerCase() === v.toLowerCase()) found = n; });
+    if (!found) { state.pool.push(v); found = v; }
+    inp.value = "";
+    if (state.selected.indexOf(found) < 0) {
+      if (state.selected.length >= MAX_SEL) { renderChips(); save(); $("count").textContent = "Added. Remove one to pick it."; $("count").className = "count warn"; return; }
+      state.selected.push(found);
+    }
+    renderChips(); changed();
+  }
+  function renderReps() {
+    $("minReps").value = state.minReps; $("maxReps").value = state.maxReps; $("failOn").checked = state.failure;
+  }
+
+  $("spinBtn").addEventListener("click", spin);
+  $("addBtn").addEventListener("click", addCustom);
+  $("newEx").addEventListener("keydown", function (e) { if (e.key === "Enter") addCustom(); });
+  $("minReps").addEventListener("change", function (e) {
+    state.minReps = clampRep(e.target.value, CONFIG.minReps);
+    if (state.maxReps < state.minReps) state.maxReps = state.minReps;
+    renderReps(); changed();
+  });
+  $("maxReps").addEventListener("change", function (e) {
+    state.maxReps = clampRep(e.target.value, CONFIG.maxReps);
+    if (state.minReps > state.maxReps) state.minReps = state.maxReps;
+    renderReps(); changed();
+  });
+  $("failOn").addEventListener("change", function (e) { state.failure = e.target.checked; changed(); });
+  $("resetBtn").addEventListener("click", function () {
+    state = defaults(); renderChips(); renderReps(); changed();
+  });
+
+  /* ---- Tabs ---- */
+  var tabs = [
+    { btn: $("tabPlay"), pane: $("panePlay") },
+    { btn: $("tabSetup"), pane: $("paneSetup") }
+  ];
+  function showTab(i, focus) {
+    tabs.forEach(function (t, j) {
+      var on = i === j;
+      t.btn.setAttribute("aria-selected", on ? "true" : "false");
+      t.btn.tabIndex = on ? 0 : -1;
+      t.pane.hidden = !on;
+    });
+    if (focus) tabs[i].btn.focus();
+  }
+  tabs.forEach(function (t, i) {
+    t.btn.addEventListener("click", function () { showTab(i, false); });
+    t.btn.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); showTab((i + 1) % tabs.length, true); }
+    });
+  });
+
+  load();
+  $("credit").textContent = CONFIG.credit || "";
+  renderChips(); renderReps(); syncReels();
+})();
+</script>
+</body>
+</html>
